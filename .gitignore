@@ -1,0 +1,119 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# PyTorch
+.pytorch_cache/
+torch_cache/
+*.pth
+*.pt
+*.ckpt
+checkpoints/
+models/
+wandb/
+
+# Hidden directories starting with a period (exclude some important ones)
+.*/
+!.git/
+!.github/
+!.gitignore
+!.vscode/
+!.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Package managers
+poetry.lock
+Pipfile.lock
+node_modules/
+# Note: uv.lock is typically committed for reproducibility
+.uv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
+.mypy_cache/
+.ruff_cache/
+.pylint.d/
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+.cache/
+
+# Generated files
+*.dot
+
+# Data and model files (common in ML projects)
+data/
+datasets/
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
