@@ -400,7 +400,7 @@ This showcases how JunGrad can be used for practical machine learning tasks beyo
 
 ## Changelog
 
-### Version 0.2.0 (2025-01-XX)
+### Version 0.2.0
 
 **Major Features:**
 - **GPU Support via CuPy**: Full GPU acceleration support using CuPy arrays
