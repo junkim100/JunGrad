@@ -10,6 +10,17 @@ from jungrad.autograd import is_grad_enabled
 from jungrad.types import Edge
 from jungrad.utils import reduce_broadcasted_grad
 
+# Helper to get array module from tensor data
+def _get_array_module_from_data(data):
+    """Get array module (np or cp) from tensor data."""
+    try:
+        import cupy as cp
+        if isinstance(data, cp.ndarray):
+            return cp
+    except (ImportError, AttributeError):
+        pass
+    return np
+
 if TYPE_CHECKING:
     from jungrad.tensor import Tensor
 else:
@@ -61,12 +72,35 @@ def add(a: Tensor, b: Tensor | float | int) -> Tensor:
     """
     from jungrad.tensor import Tensor
 
+    # Get array module from input tensor
+    xp = _get_array_module_from_data(a.data)
+
     # Convert scalar to tensor
     if not isinstance(b, Tensor):
-        b = Tensor(np.array(b, dtype=a.dtype))
+        b = Tensor(xp.array(b, dtype=a.dtype))
+    else:
+        # Ensure b is on same device as a
+        xp_b = _get_array_module_from_data(b.data)
+        if xp is not xp_b:
+            # Convert b to match a's device
+            if xp is np:
+                # Convert CuPy to NumPy
+                try:
+                    import cupy as cp
+                    if isinstance(b.data, cp.ndarray):
+                        b_data = cp.asnumpy(b.data)
+                    else:
+                        b_data = np.asarray(b.data)
+                except (ImportError, AttributeError):
+                    b_data = np.asarray(b.data)
+            else:
+                # Convert NumPy to CuPy
+                import cupy as cp
+                b_data = cp.asarray(b.data)
+            b = Tensor(b_data, requires_grad=b.requires_grad)
 
     # Forward
-    out_data = np.add(a.data, b.data)
+    out_data = xp.add(a.data, b.data)
     out = Tensor(out_data, requires_grad=a.requires_grad or b.requires_grad, op="add")
 
     # Setup backward
@@ -105,12 +139,35 @@ def sub(a: Tensor, b: Tensor | float | int) -> Tensor:
     """
     from jungrad.tensor import Tensor
 
+    # Get array module from input tensor
+    xp = _get_array_module_from_data(a.data)
+
     # Convert scalar to tensor
     if not isinstance(b, Tensor):
-        b = Tensor(np.array(b, dtype=a.dtype))
+        b = Tensor(xp.array(b, dtype=a.dtype))
+    else:
+        # Ensure b is on same device as a
+        xp_b = _get_array_module_from_data(b.data)
+        if xp is not xp_b:
+            # Convert b to match a's device
+            if xp is np:
+                # Convert CuPy to NumPy
+                try:
+                    import cupy as cp
+                    if isinstance(b.data, cp.ndarray):
+                        b_data = cp.asnumpy(b.data)
+                    else:
+                        b_data = np.asarray(b.data)
+                except (ImportError, AttributeError):
+                    b_data = np.asarray(b.data)
+            else:
+                # Convert NumPy to CuPy
+                import cupy as cp
+                b_data = cp.asarray(b.data)
+            b = Tensor(b_data, requires_grad=b.requires_grad)
 
     # Forward
-    out_data = np.subtract(a.data, b.data)
+    out_data = xp.subtract(a.data, b.data)
     out = Tensor(out_data, requires_grad=a.requires_grad or b.requires_grad, op="sub")
 
     # Setup backward
@@ -149,12 +206,35 @@ def mul(a: Tensor, b: Tensor | float | int) -> Tensor:
     """
     from jungrad.tensor import Tensor
 
+    # Get array module from input tensor
+    xp = _get_array_module_from_data(a.data)
+
     # Convert scalar to tensor
     if not isinstance(b, Tensor):
-        b = Tensor(np.array(b, dtype=a.dtype))
+        b = Tensor(xp.array(b, dtype=a.dtype))
+    else:
+        # Ensure b is on same device as a
+        xp_b = _get_array_module_from_data(b.data)
+        if xp is not xp_b:
+            # Convert b to match a's device
+            if xp is np:
+                # Convert CuPy to NumPy
+                try:
+                    import cupy as cp
+                    if isinstance(b.data, cp.ndarray):
+                        b_data = cp.asnumpy(b.data)
+                    else:
+                        b_data = np.asarray(b.data)
+                except (ImportError, AttributeError):
+                    b_data = np.asarray(b.data)
+            else:
+                # Convert NumPy to CuPy
+                import cupy as cp
+                b_data = cp.asarray(b.data)
+            b = Tensor(b_data, requires_grad=b.requires_grad)
 
     # Forward
-    out_data = np.multiply(a.data, b.data)
+    out_data = xp.multiply(a.data, b.data)
     out = Tensor(out_data, requires_grad=a.requires_grad or b.requires_grad, op="mul")
 
     # Setup backward
@@ -195,12 +275,35 @@ def div(a: Tensor, b: Tensor | float | int) -> Tensor:
     """
     from jungrad.tensor import Tensor
 
+    # Get array module from input tensor
+    xp = _get_array_module_from_data(a.data)
+
     # Convert scalar to tensor
     if not isinstance(b, Tensor):
-        b = Tensor(np.array(b, dtype=a.dtype))
+        b = Tensor(xp.array(b, dtype=a.dtype))
+    else:
+        # Ensure b is on same device as a
+        xp_b = _get_array_module_from_data(b.data)
+        if xp is not xp_b:
+            # Convert b to match a's device
+            if xp is np:
+                # Convert CuPy to NumPy
+                try:
+                    import cupy as cp
+                    if isinstance(b.data, cp.ndarray):
+                        b_data = cp.asnumpy(b.data)
+                    else:
+                        b_data = np.asarray(b.data)
+                except (ImportError, AttributeError):
+                    b_data = np.asarray(b.data)
+            else:
+                # Convert NumPy to CuPy
+                import cupy as cp
+                b_data = cp.asarray(b.data)
+            b = Tensor(b_data, requires_grad=b.requires_grad)
 
     # Forward
-    out_data = np.divide(a.data, b.data)
+    out_data = xp.divide(a.data, b.data)
     out = Tensor(out_data, requires_grad=a.requires_grad or b.requires_grad, op="div")
 
     # Setup backward
@@ -360,11 +463,35 @@ def maximum(a: Tensor, b: Tensor | float | int) -> Tensor:
         Result tensor.
     """
     from jungrad.tensor import Tensor
+    from jungrad.backend import get_array_module
+
+    # Get array module from input tensor
+    xp = _get_array_module_from_data(a.data)
 
     if not isinstance(b, Tensor):
-        b = Tensor(np.array(b, dtype=a.dtype))
+        b = Tensor(xp.array(b, dtype=a.dtype))
+    else:
+        # Ensure b is on same device as a
+        xp_b = _get_array_module_from_data(b.data)
+        if xp is not xp_b:
+            # Convert b to match a's device
+            if xp is np:
+                # Convert CuPy to NumPy
+                try:
+                    import cupy as cp
+                    if isinstance(b.data, cp.ndarray):
+                        b_data = cp.asnumpy(b.data)
+                    else:
+                        b_data = np.asarray(b.data)
+                except (ImportError, AttributeError):
+                    b_data = np.asarray(b.data)
+            else:
+                # Convert NumPy to CuPy
+                import cupy as cp
+                b_data = cp.asarray(b.data)
+            b = Tensor(b_data, requires_grad=b.requires_grad)
 
-    out_data = np.maximum(a.data, b.data)
+    out_data = xp.maximum(a.data, b.data)
     requires_grad = a.requires_grad or b.requires_grad
     out = Tensor(out_data, requires_grad=requires_grad, op="maximum")
 
@@ -679,8 +806,31 @@ def matmul(a: Tensor, b: Tensor) -> Tensor:
     Returns:
         Result tensor (..., M, K).
     """
+    # Get array module from input tensors
+    xp = _get_array_module_from_data(a.data)
+    xp_b = _get_array_module_from_data(b.data)
+
+    # Ensure both tensors are on same device
+    if xp is not xp_b:
+        # Convert b to match a's device
+        if xp is np:
+            # Convert CuPy to NumPy
+            try:
+                import cupy as cp
+                if isinstance(b.data, cp.ndarray):
+                    b_data = cp.asnumpy(b.data)
+                else:
+                    b_data = np.asarray(b.data)
+            except (ImportError, AttributeError):
+                b_data = np.asarray(b.data)
+        else:
+            # Convert NumPy to CuPy
+            import cupy as cp
+            b_data = cp.asarray(b.data)
+        b = Tensor(b_data, requires_grad=b.requires_grad)
+
     # Forward
-    out_data = np.matmul(a.data, b.data)
+    out_data = xp.matmul(a.data, b.data)
     out = Tensor(out_data, requires_grad=a.requires_grad or b.requires_grad, op="matmul")
 
     # Setup backward
@@ -690,7 +840,7 @@ def matmul(a: Tensor, b: Tensor) -> Tensor:
 
             def grad_fn_a(grad: np.ndarray) -> np.ndarray:
                 # dA = grad @ B^T
-                return np.matmul(grad, np.swapaxes(b.data, -2, -1))
+                return xp.matmul(grad, xp.swapaxes(b.data, -2, -1))
 
             parents.append(Edge(a, grad_fn_a))
 
@@ -698,7 +848,7 @@ def matmul(a: Tensor, b: Tensor) -> Tensor:
 
             def grad_fn_b(grad: np.ndarray) -> np.ndarray:
                 # dB = A^T @ grad
-                return np.matmul(np.swapaxes(a.data, -2, -1), grad)
+                return xp.matmul(xp.swapaxes(a.data, -2, -1), grad)
 
             parents.append(Edge(b, grad_fn_b))
 
@@ -857,10 +1007,11 @@ def concat(tensors: tuple[Tensor, ...] | list[Tensor], dim: int = 0) -> Tensor:
                 end = split_points[i + 1]
 
                 def make_grad_fn(start_idx, end_idx, tensor_shape):
+                    import builtins
                     def grad_fn(grad: np.ndarray) -> np.ndarray:
                         # Extract slice for this tensor
-                        slices = [slice(None)] * len(grad.shape)
-                        slices[dim] = slice(start_idx, end_idx)
+                        slices = [builtins.slice(None)] * len(grad.shape)
+                        slices[dim] = builtins.slice(start_idx, end_idx)
                         return grad[tuple(slices)]
 
                     return grad_fn
@@ -896,9 +1047,10 @@ def stack(tensors: tuple[Tensor, ...] | list[Tensor], dim: int = 0) -> Tensor:
             if t.requires_grad:
 
                 def make_grad_fn(tensor_idx, tensor_dim):
+                    import builtins
                     def grad_fn(grad: np.ndarray) -> np.ndarray:
                         # Unstack: extract slice along new dimension
-                        slices = [slice(None)] * len(grad.shape)
+                        slices = [builtins.slice(None)] * len(grad.shape)
                         slices[tensor_dim] = tensor_idx
                         return grad[tuple(slices)]
 
@@ -921,8 +1073,11 @@ def squeeze(a: Tensor, dim: int | tuple[int, ...] | None = None) -> Tensor:
     Returns:
         Result tensor.
     """
+    # Get array module from input tensor
+    xp = _get_array_module_from_data(a.data)
+
     # Forward
-    out_data = np.squeeze(a.data, axis=dim)
+    out_data = xp.squeeze(a.data, axis=dim)
     out = Tensor(out_data, requires_grad=a.requires_grad, op="squeeze")
 
     # Setup backward
@@ -1090,18 +1245,26 @@ def slice(a: Tensor, dim: int, start: int, end: int) -> Tensor:
     Returns:
         Result tensor.
     """
-    # Forward
-    slices = [slice(None)] * len(a.shape)
-    slices[dim] = slice(start, end)
+    # Get array module from input tensor
+    xp = _get_array_module_from_data(a.data)
+
+    # Forward - use built-in slice to avoid naming conflict
+    import builtins
+    slices = [builtins.slice(None)] * len(a.shape)
+    slices[dim] = builtins.slice(start, end)
     out_data = a.data[tuple(slices)]
     out = Tensor(out_data, requires_grad=a.requires_grad, op="slice")
 
     # Setup backward
     if out.requires_grad:
+        # Store slices for backward pass
+        import builtins
+        backward_slices = [builtins.slice(None)] * len(a.shape)
+        backward_slices[dim] = builtins.slice(start, end)
 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
-            grad_out = np.zeros_like(a.data)
-            grad_out[tuple(slices)] = grad
+            grad_out = xp.zeros_like(a.data)
+            grad_out[tuple(backward_slices)] = grad
             return grad_out
 
         out.parents = (Edge(a, grad_fn),)

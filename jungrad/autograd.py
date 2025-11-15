@@ -6,6 +6,11 @@ from typing import Optional
 
 import numpy as np
 
+try:  # pragma: no cover - optional CuPy dependency
+    import cupy as cp  # type: ignore
+except Exception:  # pragma: no cover - CuPy optional
+    cp = None  # type: ignore
+
 from jungrad.types import Edge, Node
 from jungrad.utils import get_logger
 
@@ -88,6 +93,28 @@ def toposort(outputs) -> list:
     return result
 
 
+def _get_array_module(data):
+    """Return np or cp to match ``data``."""
+
+    if cp is not None:
+        if isinstance(data, cp.ndarray):
+            return cp
+    return np
+
+
+def _ensure_array_on_xp(array, xp):
+    """Ensure ``array`` lives on the array module ``xp``."""
+
+    if xp is np:
+        if cp is not None and isinstance(array, cp.ndarray):
+            return cp.asnumpy(array)
+        return np.asarray(array)
+    # xp is CuPy here
+    if isinstance(array, xp.ndarray):  # type: ignore[attr-defined]
+        return array
+    return xp.asarray(array)
+
+
 def backward(output, grad: Optional[np.ndarray] = None) -> None:
     """Run backward pass to compute gradients.
 
@@ -102,11 +129,17 @@ def backward(output, grad: Optional[np.ndarray] = None) -> None:
     topo = toposort(output)
 
     # Initialize output gradient
+    xp_out = _get_array_module(output.data)
+
     if grad is None:
-        grad = np.ones_like(output.data)
+        grad = xp_out.ones_like(output.data)
+    else:
+        grad = _ensure_array_on_xp(grad, xp_out)
 
     if output.grad is None:
-        output.grad = np.zeros_like(output.data)
+        output.grad = xp_out.zeros_like(output.data)
+    else:
+        output.grad = _ensure_array_on_xp(output.grad, xp_out)
     output.grad += grad
 
     # Backward through graph in reverse topological order
@@ -129,8 +162,12 @@ def backward(output, grad: Optional[np.ndarray] = None) -> None:
                 parent_grad = tensor.grad
 
             # Initialize parent grad if needed
-            if parent.grad is None:
-                parent.grad = np.zeros_like(parent.data)
+            xp_parent = _get_array_module(parent.data)
+            parent_grad = _ensure_array_on_xp(parent_grad, xp_parent)
 
-            # Accumulate gradient in parent
+            if parent.grad is None:
+                parent.grad = xp_parent.zeros_like(parent.data)
+            else:
+                parent.grad = _ensure_array_on_xp(parent.grad, xp_parent)
+
             parent.grad += parent_grad

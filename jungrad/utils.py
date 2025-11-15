@@ -41,8 +41,18 @@ def asarray(x, dtype=None) -> np.ndarray:
         dtype: Optional dtype to use.
 
     Returns:
-        NumPy array.
+        NumPy array (or CuPy array if input is CuPy array).
     """
+    # Handle CuPy arrays - keep them as CuPy arrays for GPU support
+    try:
+        import cupy as cp
+
+        if isinstance(x, cp.ndarray):
+            # Return CuPy array directly (it's compatible with NumPy interface)
+            return x if dtype is None else x.astype(dtype)
+    except (ImportError, AttributeError):
+        pass
+
     return np.asarray(x, dtype=dtype)
 
 

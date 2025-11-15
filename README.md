@@ -398,6 +398,41 @@ The `quickstart.ipynb` tutorial includes a complete end-to-end classification de
 
 This showcases how JunGrad can be used for practical machine learning tasks beyond synthetic examples.
 
+## Changelog
+
+### Version 0.2.0 (2025-01-XX)
+
+**Major Features:**
+- **GPU Support via CuPy**: Full GPU acceleration support using CuPy arrays
+  - Automatic device detection and conversion between NumPy and CuPy
+  - Device-aware operations throughout the library
+  - Seamless fallback to CPU when CuPy is not available
+  - New `backend` module with utilities: `has_cupy()`, `get_array_module()`, `to_device_array()`, `to_numpy_array()`
+
+**Improvements:**
+- All operations (`add`, `sub`, `mul`, `div`, `matmul`, `maximum`, etc.) now handle mixed NumPy/CuPy arrays
+- Autograd engine is device-aware and maintains device consistency during backpropagation
+- Embedding layer backward pass updated for GPU compatibility
+- `asarray` utility preserves CuPy arrays instead of converting to NumPy
+
+**Technical Details:**
+- Operations automatically detect array module (NumPy or CuPy) from input tensors
+- Device conversion handled transparently during tensor operations
+- Gradient accumulation maintains device consistency across the computation graph
+
+### Version 0.1.0 (Initial Release)
+
+- Core N-D tensor implementation with autograd
+- Comprehensive operations library (200+ operations)
+- Neural network modules (Linear, Conv1d, Embedding, LayerNorm, Dropout)
+- Optimizers (SGD, Adam, AdamW, RMSProp)
+- Learning rate schedulers (StepLR, CosineLR, OneCycleLR, ExponentialLR)
+- Loss functions (MSE, cross-entropy, BCE with logits)
+- Functional API with activations
+- Gradient checking utilities
+- Computation graph visualization
+- Performance profiling tools
+
 ## License
 
 MIT License

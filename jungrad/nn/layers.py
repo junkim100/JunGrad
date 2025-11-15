@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 import numpy as np
 
+from jungrad.backend import get_array_module, to_device_array, to_numpy_array
 from jungrad.nn.module import Module, Parameter
 from jungrad.ops import add, matmul
 from jungrad.tensor import Tensor, randn, zeros, ones
@@ -284,13 +286,35 @@ class Conv1d(Module):
         return f"Conv1d(in_channels={self.in_channels}, out_channels={self.out_channels}, kernel_size={self.kernel_size}, stride={self.stride}, padding={self.padding}, bias={self._parameters['bias'] is not None})"
 
 
+def _sinusoidal_table(max_len: int, dim: int, device: str) -> np.ndarray:
+    """Create sinusoidal positional encodings."""
+
+    xp = get_array_module(device)
+    position = xp.arange(max_len, dtype=xp.float32)[:, None]
+    div_term = xp.exp(xp.arange(0, dim, 2, dtype=xp.float32) * -(math.log(10000.0) / dim))
+    table = xp.zeros((max_len, dim), dtype=xp.float32)
+    table[:, 0::2] = xp.sin(position * div_term)
+    table[:, 1::2] = xp.cos(position * div_term)
+    return to_numpy_array(table)
+
+
 class Embedding(Module):
     """Embedding layer.
 
     Maps integer indices to dense vectors.
     """
 
-    def __init__(self, num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None):
+    def __init__(
+        self,
+        num_embeddings: int,
+        embedding_dim: int,
+        padding_idx: Optional[int] = None,
+        *,
+        positional_encoding: Optional[str] = None,
+        max_position_embeddings: Optional[int] = None,
+        dropout: float = 0.0,
+        device: str = "cpu",
+    ):
         """Initialize embedding layer.
 
         Args:
@@ -299,9 +323,15 @@ class Embedding(Module):
             padding_idx: If specified, pad embedding at this index.
         """
         super().__init__()
+        if dropout < 0 or dropout >= 1:
+            raise ValueError("dropout must be in [0, 1)")
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
         self.padding_idx = padding_idx
+        self.device = device.lower()
+        self.positional_encoding = positional_encoding.lower() if positional_encoding else None
+        self.max_position_embeddings = max_position_embeddings
+        self._dropout = Dropout(dropout) if dropout > 0 else None
 
         # Initialize weights
         weight = randn(num_embeddings, embedding_dim, requires_grad=True)
@@ -310,7 +340,38 @@ class Embedding(Module):
 
         self.register_parameter("weight", Parameter(weight.data, name="weight"))
 
-    def forward(self, x: Tensor | np.ndarray) -> Tensor:
+        # Positional encodings
+        if self.positional_encoding is not None:
+            if max_position_embeddings is None:
+                raise ValueError(
+                    "max_position_embeddings is required when positional_encoding is enabled"
+                )
+            if self.positional_encoding not in {"sinusoidal", "learned"}:
+                raise ValueError("positional_encoding must be 'sinusoidal', 'learned', or None")
+            if self.positional_encoding == "learned":
+                position_weight = randn(max_position_embeddings, embedding_dim, requires_grad=True)
+                self.register_parameter(
+                    "position_embeddings",
+                    Parameter(position_weight.data, name="position_embeddings"),
+                )
+            else:
+                sinusoidal = _sinusoidal_table(max_position_embeddings, embedding_dim, self.device)
+                self.register_buffer(
+                    "position_embeddings",
+                    Tensor(sinusoidal, requires_grad=False, name="position_embeddings"),
+                )
+        else:
+            self.register_parameter("position_embeddings", None)
+
+    def _default_position_ids(self, shape: tuple[int, ...]) -> np.ndarray:
+        if len(shape) == 0:
+            return np.zeros((1,), dtype=np.int64)
+        position_grid = np.indices(shape, dtype=np.int64)[-1]
+        return position_grid
+
+    def forward(
+        self, x: Tensor | np.ndarray, position_ids: Tensor | np.ndarray | None = None
+    ) -> Tensor:
         """Forward pass.
 
         Args:
@@ -328,28 +389,87 @@ class Embedding(Module):
         indices_flat = indices_np.flatten()
 
         # Lookup embeddings
-        weight_data = self._parameters["weight"].data
-        embeddings = weight_data[indices_flat]  # (N, embedding_dim)
+        weight_data = to_device_array(self._parameters["weight"].data, self.device)
+        xp = get_array_module(self.device)
+        indices_device = to_device_array(indices_flat, self.device).astype(np.int64)
+        embeddings = weight_data[indices_device]  # (N, embedding_dim)
         output_shape = original_shape + (self.embedding_dim,)
-        output_np = embeddings.reshape(output_shape)
+        output_xp = embeddings.reshape(output_shape)
 
+        # Positional encoding
+        if self.positional_encoding is not None:
+            if position_ids is None:
+                positions = self._default_position_ids(original_shape)
+            elif isinstance(position_ids, Tensor):
+                positions = position_ids.data.astype(np.int64)
+            else:
+                positions = np.asarray(position_ids, dtype=np.int64)
+            if positions.shape != original_shape:
+                raise ValueError("position_ids must have the same shape as input indices")
+            max_pos = int(positions.max()) if positions.size else 0
+            if max_pos >= int(self.max_position_embeddings or 0):
+                raise ValueError("position_ids exceed max_position_embeddings; increase the limit")
+            pos_flat = positions.reshape(-1)
+            if self.positional_encoding == "learned":
+                pos_table = to_device_array(
+                    self._parameters["position_embeddings"].data, self.device
+                )
+            else:
+                pos_table = to_device_array(self._buffers["position_embeddings"].data, self.device)
+            pos_embeddings = pos_table[pos_flat].reshape(output_shape)
+            output_xp = output_xp + pos_embeddings
+
+        output_np = to_numpy_array(output_xp)
         output = Tensor(output_np, requires_grad=self._parameters["weight"].requires_grad)
 
         # Set up backward
         if output.requires_grad:
+            # Get array module for device consistency
+            weight_data = self._parameters["weight"].data
+            xp = get_array_module(self.device)
+
+            # Store indices on the correct device for backward pass
+            indices_device = to_device_array(indices_flat, self.device).astype(np.int64)
 
             def grad_fn(grad: np.ndarray) -> np.ndarray:
+                # Convert grad to device array if needed
+                grad_device = to_device_array(grad, self.device)
+
                 # Gradient w.r.t. weight: scatter grad to weight positions
-                grad_weight = np.zeros_like(weight_data)
-                grad_flat = grad.reshape(-1, self.embedding_dim)
-                for i, idx in enumerate(indices_flat):
-                    grad_weight[idx] += grad_flat[i]
-                return grad_weight
+                grad_weight = xp.zeros_like(weight_data)
+                grad_flat = grad_device.reshape(-1, self.embedding_dim)
+
+                # Use vectorized scatter operation
+                # Convert indices to device array
+                indices_dev = to_device_array(indices_device, self.device).astype(xp.int64)
+
+                # Use advanced indexing to scatter gradients
+                # This is more efficient than a loop and handles device consistency
+                unique_indices = xp.unique(indices_dev)
+                for idx in unique_indices:
+                    # Create mask on the same device
+                    mask = indices_dev == idx
+                    # Sum gradients for this index
+                    grad_sum = xp.sum(grad_flat[mask], axis=0)
+                    # Ensure grad_sum is a proper array on the device
+                    if not isinstance(grad_sum, xp.ndarray):
+                        grad_sum = xp.asarray(grad_sum)
+                    grad_sum = to_device_array(grad_sum, self.device)
+                    # Convert idx to Python int for indexing
+                    idx_int = int(to_numpy_array(idx).item())
+                    # Perform addition on the same device
+                    grad_weight[idx_int] = xp.add(grad_weight[idx_int], grad_sum)
+
+                # Convert back to NumPy if needed for parameter update
+                return to_numpy_array(grad_weight)
 
             from jungrad.types import Edge
 
             output.parents = (Edge(self._parameters["weight"], grad_fn),)
             output.op = "embedding"
+
+        if self._dropout is not None:
+            output = self._dropout(output)
 
         return output
 

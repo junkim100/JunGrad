@@ -5,6 +5,12 @@ Project name: JunGrad
 """
 
 from jungrad.autograd import enable_grad, is_grad_enabled, no_grad, set_grad_enabled
+from jungrad.backend import (
+    get_array_module,
+    has_cupy,
+    to_device_array,
+    to_numpy_array,
+)
 from jungrad.losses import bce_with_logits, cross_entropy, mse_loss
 from jungrad.nn import (
     Conv1d,
@@ -35,7 +41,7 @@ from jungrad import graphviz
 # Profiler
 from jungrad import profiler
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core
@@ -85,4 +91,9 @@ __all__ = [
     # Tools
     "graphviz",
     "profiler",
+    # Backend helpers
+    "has_cupy",
+    "get_array_module",
+    "to_device_array",
+    "to_numpy_array",
 ]
